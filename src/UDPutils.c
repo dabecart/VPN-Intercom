@@ -115,7 +115,9 @@ void* waitingAckThread(void* args){
         if(deviceIndex < MAX_SUPPORTED_DEVICES) break; // out of the repetitions loop.
       }
     }else{
-      printf("Missing ack %d/%d\n", repetitions+1, UDP_SENDING_REPETITIONS);
+      printf("Missing ack %d/%d. Sending again...\n", repetitions+1, UDP_SENDING_REPETITIONS);
+
+      
     }
   }
 
