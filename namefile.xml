@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<nametable>
+  <node>
+    <ip>10.215.133.1</ip>
+    <acronym>rpi2</acronym>
+  </node>
+
+  <node>
+    <ip>10.215.133.2</ip>
+    <acronym>andr</acronym>
+  </node>
+
+  <node>
+    <ip>10.215.133.6</ip>
+    <acronym>trst</acronym>
+  </node>
+
+  <node>
+    <ip>10.215.133.5</ip>
+    <acronym>rpi4</acronym>
+  </node>
+</nametable>
