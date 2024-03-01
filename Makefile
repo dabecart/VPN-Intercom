@@ -1,5 +1,5 @@
 TARGET_EXEC := final_program
-TARGET_DEVICE_BUILD := __RPI2__
+TARGET_DEVICE_BUILD := __RPI4__
 
 BUILD_DIR := ./build
 SRC_DIRS := ./src
