@@ -1,9 +1,9 @@
 TARGET_EXEC := final_program
-TARGET_DEVICE_BUILD := __RPI4__
+TARGET_DEVICE_BUILD := __RPI2__
 
 BUILD_DIR := ./build
 SRC_DIRS := ./src
-LIBS_FLAGS := -I/usr/include/libxml2 -lxml2
+LIBS_FLAGS := -I/usr/include/libxml2 -lxml2 -lpthread
 
 # Find all the C and C++ files we want to compile
 # Note the single quotes around the * expressions. The shell will incorrectly expand these otherwise, but we want to send the * directly to the find command.
