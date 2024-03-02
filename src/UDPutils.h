@@ -15,6 +15,7 @@
 #include <sys/time.h>
 
 #include "xml.h"
+#include "own.h"
 
 #define VPN_PREFIX "10.215.133."
 #define MAX_SUPPORTED_DEVICES 10
@@ -47,6 +48,7 @@ int sendBufferTo(char* buffer, int buffer_size, const char* ip_address);
 int sendXMLPacketTo(XML_Packet xml, char* ip_address, uint8_t flags, 
                     pthread_cond_t* ackCondition,  pthread_cond_t* responseCondition);
 int sendAckPacketTo(XML_Packet *pack);
+int sendResponseTo(XML_Packet *pack);
 
 void getVPN_IP(char returnIP[]);
 
