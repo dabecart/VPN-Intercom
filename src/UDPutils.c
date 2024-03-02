@@ -45,13 +45,15 @@ void* UDPListener(void *args) {
     int parseResult = toXMLPacket(doc, &inputPacket);
     pthread_mutex_unlock(&mutexPacket);
 
+
     if(parseResult){
       //XML file could not be parsed.
       continue;
     }
 
     // If it's a RESPONSE of any kind, check it out. 
-    if(inputPacket.header.responseTime>0 || inputPacket.header.isAck || inputPacket.header.isResponse){
+    if(inputPacket.header.responseTime>0 && (inputPacket.header.isAck || inputPacket.header.isResponse)){
+      printf("Waking up response received\n");
       pthread_cond_signal(&responseReceived_wakeUp);
       continue;
     }
@@ -227,6 +229,7 @@ int sendAckPacketTo(XML_Packet *pack){
   memcpy(&response.header, &pack->header, sizeof(response.header));
   response.header.isAck = 1;
   sendXMLPacketTo(response, response.header.transmitterAddress, 0);
+  printf("Ack sent!\n");
   return 0;
 }
 
@@ -288,15 +291,21 @@ void setupUDPServer(){
 
     // Bind socket to address and port
     if(bind(server_socket, (struct sockaddr *)&server_address, sizeof(server_address)) == -1) {
-        perror("Error binding socket");
-        close(server_socket);
-        exit(EXIT_FAILURE);
+      perror("Error binding socket");
+      close(server_socket);
+      exit(EXIT_FAILURE);
     }
 
     memset(&acklist, 0, sizeof(acklist));
 
     if(pthread_mutex_init(&mutexPacket, NULL) != 0){
-      printf("Mutex init has failed\n");
+      perror("Mutex init has failed");
+      exit(EXIT_FAILURE);
+    }
+
+    if (pthread_cond_init(&responseReceived_wakeUp, NULL) != 0) {
+      // Error handling if initialization fails
+      perror("pthread_cond_init");
       exit(EXIT_FAILURE);
     }
 
