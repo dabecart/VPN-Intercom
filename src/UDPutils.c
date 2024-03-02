@@ -62,6 +62,8 @@ void* UDPListener(void *args) {
     if(inputPacket.header.expectsAck){
       sendAckPacketTo(&inputPacket);
     }
+    // Each device will answer to packets differently.
+    processIncomingPackages(&inputPacket);
   }
 
   return NULL;
@@ -241,11 +243,23 @@ int sendXMLPacketTo(XML_Packet xml, char* ip_address, uint8_t flags,
 }
 
 int sendAckPacketTo(XML_Packet *pack){
+  // For the ack, as it can be later used for the response, it's better to create
+  // a quick copy and just sent an empty ack.
   XML_Packet response = createXMLPacket();
   memcpy(&response.header, &pack->header, sizeof(response.header));
   response.header.isAck = 1;
   sendXMLPacketTo(response, response.header.transmitterAddress, 0, NULL, NULL);
   printf("Ack sent!\n");
+  return 0;
+}
+
+int sendResponseTo(XML_Packet *pack){
+  pack->header.isAck = 0;
+  pack->header.isResponse = 1;
+  pack->header.expectsAck = 0; // Maybe this will be temporary...
+
+  sendXMLPacketTo(*pack, pack->header.transmitterAddress, 0, NULL, NULL);
+  printf("Response sent\n");
   return 0;
 }
 

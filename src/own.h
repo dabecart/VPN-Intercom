@@ -13,11 +13,13 @@
 
 #include "xml.h"
 #include "UDPutils.h"
+#include "webcam.h"
 
 typedef struct{
   char myIP[16];
 }OwnVariables;
 
 pthread_t* launchRuntimeRoutine();
+int processIncomingPackages(XML_Packet* packet);
 
 #endif
