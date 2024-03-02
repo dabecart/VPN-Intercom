@@ -30,7 +30,7 @@ void* UDPListener(void *args) {
     }
 
     // Print received message
-    printf("Received message from %s:%d: %s", inet_ntoa(client_address.sin_addr),
+    printf("Received message from %s:%d: \x1b[35m %s \x1b[0m", inet_ntoa(client_address.sin_addr),
       ntohs(client_address.sin_port), inputBuffer);
 
     // Check if received message is XML or not.
@@ -89,6 +89,7 @@ void* waitingAckThread(void* args){
       pthread_mutex_lock(&mutexPacket);
       if(inputPacket.header.isAck){
         int IP_port = atoi(strrchr(inputPacket.header.receiverAddress,'.') + 1);
+        printf("Device with ending IP %d woke me up\n", IP_port);
 
         int deviceIndex;
         for(deviceIndex = 0; deviceIndex < MAX_SUPPORTED_DEVICES; deviceIndex++){
@@ -99,19 +100,24 @@ void* waitingAckThread(void* args){
             if(acklist[deviceIndex].expectingAck){
               if(acklist[deviceIndex].ackCondition != NULL){
                 pthread_cond_signal(acklist[deviceIndex].ackCondition);
-                acklist[deviceIndex].ackCondition = NULL;
-                acklist[deviceIndex].expectingAck = 0;
-                breakCondition = 1; // found the correspondant ack.
               }
+              acklist[deviceIndex].expectingAck = 0;
+              breakCondition = 1; // found the correspondant ack.
+              printf("Ack found!\n");
             }
 
             if(acklist[deviceIndex].expectingResponse){
               if(acklist[deviceIndex].responseCondition != NULL){
                 pthread_cond_signal(acklist[deviceIndex].responseCondition);
-                acklist[deviceIndex].responseCondition = NULL;
-                acklist[deviceIndex].responseCondition = 0;
-                breakCondition = 1; // found the correspondant response.
               }
+              acklist[deviceIndex].expectingResponse = 0;
+              breakCondition = 1; // found the correspondant response.
+              printf("Response found!\n");
+            }
+
+            if(!acklist[deviceIndex].expectingAck && !acklist[deviceIndex].expectingResponse){
+              // Everything has been managed, erase it all!
+              memset(&acklist[deviceIndex], 0, sizeof(acklist[deviceIndex]));
             }
 
             if(breakCondition) break; // End the search for correspondant acklist.
@@ -166,7 +172,8 @@ int sendBufferTo(char* buffer, int buffer_size, const char* ip_address){
   return 0;
 }
 
-int sendXMLPacketTo(XML_Packet xml, const char* ip_address, uint8_t flags){
+int sendXMLPacketTo(XML_Packet xml, char* ip_address, uint8_t flags, 
+                    pthread_cond_t* ackCondition,  pthread_cond_t* responseCondition){
   if(ip_address == NULL){
     fprintf(stderr, "No IP given");
     return -1;
@@ -187,6 +194,15 @@ int sendXMLPacketTo(XML_Packet xml, const char* ip_address, uint8_t flags){
 
   if(flags&XML_ACK_NEEDED){
     xml.header.expectsAck = 1;
+    // Add to the acknowledge watch list.
+    int deviceIPIndex = getIPDevice(ip_address);
+    if(deviceIPIndex < 0){
+      return -1;
+    }
+
+    acklist[deviceIPIndex].expectingAck = 1;
+    acklist[deviceIPIndex].lastTimeSent = xml.header.sentTime;
+    acklist[deviceIPIndex].ackCondition = ackCondition;
   }
 
   // Convert to XML file
@@ -228,7 +244,7 @@ int sendAckPacketTo(XML_Packet *pack){
   XML_Packet response = createXMLPacket();
   memcpy(&response.header, &pack->header, sizeof(response.header));
   response.header.isAck = 1;
-  sendXMLPacketTo(response, response.header.transmitterAddress, 0);
+  sendXMLPacketTo(response, response.header.transmitterAddress, 0, NULL, NULL);
   printf("Ack sent!\n");
   return 0;
 }
@@ -238,40 +254,54 @@ void getVPN_IP(char returnIP[]){
   int family, s;
   char host[NI_MAXHOST]; 
 
-  if (getifaddrs(&ifaddr) == -1) {
-    perror("getifaddrs");
-    exit(EXIT_FAILURE);
-  }
+  // Only fetch the IP of the device ONCE and store it to this variable.
+  if(!deviceIP[0]){
+    if (getifaddrs(&ifaddr) == -1) {
+      perror("getifaddrs");
+      exit(EXIT_FAILURE);
+    }
 
-  for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-    if (ifa->ifa_addr == NULL)
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+      if (ifa->ifa_addr == NULL)
         continue;
 
-    family = ifa->ifa_addr->sa_family;
+      family = ifa->ifa_addr->sa_family;
 
-    if (family == AF_INET || family == AF_INET6) {
-      s = getnameinfo(ifa->ifa_addr,
-        (family == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6),
-        host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-      if (s != 0) {
-        printf("getnameinfo() failed: %s\n", gai_strerror(s));
-        exit(EXIT_FAILURE);
-      }
+      if (family == AF_INET || family == AF_INET6) {
+        s = getnameinfo(ifa->ifa_addr,
+          (family == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6),
+          host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+        if (s != 0) {
+          printf("getnameinfo() failed: %s\n", gai_strerror(s));
+          exit(EXIT_FAILURE);
+        }
 
-      if (family == AF_INET) {
-        if (strncmp(host, VPN_PREFIX, strlen(VPN_PREFIX)) == 0) {
-          printf("Interface: %s, Address: %s\n", ifa->ifa_name, host);
-          break;
+        if (family == AF_INET) {
+          if (strncmp(host, VPN_PREFIX, strlen(VPN_PREFIX)) == 0) {
+            printf("Interface: %s, Address: %s\n", ifa->ifa_name, host);
+            break;
+          }
         }
       }
     }
+
+    memcpy(deviceIP, host, strlen(host));
+
+    // Clean memory.
+    freeifaddrs(ifaddr);
   }
 
   // Output to argument of function.
-  memcpy(returnIP, host, strlen(host));
+  memcpy(returnIP, deviceIP, strlen(deviceIP));
+}
 
-  // Clean memory.
-  freeifaddrs(ifaddr);
+int getIPDevice(char* fullIP){
+  if(strncmp(fullIP, VPN_PREFIX, strlen(VPN_PREFIX)) == 0){
+    return atoi(strrchr(fullIP,'.') + 1);
+  }else{
+    fprintf(stderr, "Strange IP detected! %s", fullIP);
+    return -1;
+  }
 }
 
 void setupUDPServer(){

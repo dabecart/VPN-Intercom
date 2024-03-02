@@ -44,10 +44,14 @@ int sendBufferTo(char* buffer, int buffer_size, const char* ip_address);
 #define XML_ACK_NEEDED 0x01
 #define XML_BLOCK 0x02
 #define XML_REPEAT_UNTIL_ACK 0x04
-int sendXMLPacketTo(XML_Packet xml, const char* ip_address, uint8_t flags);
+int sendXMLPacketTo(XML_Packet xml, char* ip_address, uint8_t flags, 
+                    pthread_cond_t* ackCondition,  pthread_cond_t* responseCondition);
 int sendAckPacketTo(XML_Packet *pack);
 
 void getVPN_IP(char returnIP[]);
 
+// Returns the last digit of the IP. If it does not start
+// with the VPN_PREFIX it will return -1. 
+int getIPDevice(char* fullIP);
 
 #endif

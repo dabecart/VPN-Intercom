@@ -61,8 +61,8 @@ xmlDocPtr toXMLDocument(XML_Packet packet) {
     xmlAddChild(headerNode, child);
 
     uint8_t flags = packet.header.expectsAck;
-    flags = (flags << 1) | packet.header.isResponse;
-    flags = (flags << 1) | packet.header.isAck;
+    flags |= packet.header.isResponse << 1;
+    flags |= packet.header.isAck << 2;
     sprintf(dumbCopy, "%d", flags);
     child = createXmlNode(doc, "flags", dumbCopy);
     xmlAddChild(headerNode, child);
