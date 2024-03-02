@@ -10,6 +10,8 @@ pthread_mutex_t mutexPacket;
 pthread_t rx_handle, tx_handle;
 pthread_cond_t responseReceived_wakeUp;
 
+char deviceIP[16];
+
 void* UDPListener(void *args) {
   struct sockaddr_in client_address;
   char inputBuffer[BUFFER_SIZE];
@@ -40,9 +42,14 @@ void* UDPListener(void *args) {
 
     // If it is XML, parse the document and process it.
     pthread_mutex_lock(&mutexPacket);
-    inputPacket = toXMLPacket(doc);
+    int parseResult = toXMLPacket(doc, &inputPacket);
     pthread_mutex_unlock(&mutexPacket);
-    
+
+    if(parseResult){
+      //XML file could not be parsed.
+      continue;
+    }
+
     // If it's a RESPONSE of any kind, check it out. 
     if(inputPacket.header.responseTime>0 || inputPacket.header.isAck || inputPacket.header.isResponse){
       pthread_cond_signal(&responseReceived_wakeUp);
@@ -166,9 +173,14 @@ int sendXMLPacketTo(XML_Packet xml, const char* ip_address, uint8_t flags){
   // Update sending time.
   uint64_t startTime = (uint64_t) time(NULL);
   if(xml.header.isResponse || xml.header.isAck){
+    // This packet is a response.
     xml.header.responseTime = startTime;
   }else{
+    // This packet is a query.
     xml.header.sentTime = startTime;
+    // Se the transmitter/receiver IPs.
+    memcpy(xml.header.transmitterAddress, deviceIP, strlen(deviceIP));
+    memcpy(xml.header.receiverAddress, ip_address, strlen(ip_address));
   }
 
   if(flags&XML_ACK_NEEDED){
@@ -287,6 +299,9 @@ void setupUDPServer(){
       printf("Mutex init has failed\n");
       exit(EXIT_FAILURE);
     }
+
+    // Store the device IP to later create messages.
+    getVPN_IP(deviceIP);
 
     printf("UDP server listening on port %d...\n", PORT);
 }

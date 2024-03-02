@@ -11,6 +11,17 @@ void vector_init(Vector *vector) {
     vector->capacity = INITIAL_CAPACITY;
 }
 
+void vector_set(Vector *vector, char* content, size_t size){
+    vector->data = (char *)malloc(sizeof(char) * size);
+    if (vector->data == NULL) {
+        fprintf(stderr, "Memory allocation failed\n");
+        exit(EXIT_FAILURE);
+    }
+    memcpy(vector->data, content, size);
+    vector->size = size;
+    vector->capacity = size;
+}
+
 // Function to add an element to the vector
 void vector_add(Vector *vector, char value) {
     if (vector->size >= vector->capacity) {

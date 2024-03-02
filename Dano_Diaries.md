@@ -1,4 +1,4 @@
-# Dano Diaries
+# Devlog: Dano Diaries
 
 Here I have my TODO chores because if I write them all over the code, I'll end up loosing them. ✨
 

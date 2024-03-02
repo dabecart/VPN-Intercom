@@ -37,13 +37,13 @@ static const char* XML_TYPE_NAMES[5] = {"bool", "int", "decimal", "string", "buf
 typedef struct{
     char transmitterAddress[16];
     char receiverAddress[16];
-    char deviceAcronym[30];
-    uint32_t packetSize;
-    uint32_t packetNumber;
+    char transmitterAcronym[30];
+    uint64_t dataSize;
     char functionSemantic[30];
     uint64_t sentTime;
     uint64_t responseTime;
 
+    // Flags
     uint8_t expectsAck;
     uint8_t isResponse;
     uint8_t isAck;
@@ -79,6 +79,6 @@ XML_Packet createXMLPacket();
 xmlDocPtr toXMLDocument(XML_Packet packet);
 
 // Function to convert from xmlDocPtr to a XML packet.
-XML_Packet toXMLPacket(xmlDocPtr ptr);
+int toXMLPacket(xmlDocPtr ptr, XML_Packet *pack);
 
 #endif

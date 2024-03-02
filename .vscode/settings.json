@@ -9,6 +9,7 @@
         "types.h": "c",
         "udputils.h": "c",
         "netdb.h": "c",
-        "xml.h": "c"
+        "xml.h": "c",
+        "vector.h": "c"
     }
 }

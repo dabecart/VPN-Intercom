@@ -9,9 +9,7 @@ void* runtime_routine(void* args){
   getVPN_IP(vbes.myIP);
 
   // Create the XML fields
-  XML_Packet packet = createXMLPacket(1);
-  printf("IP: %s\n", packet.header.receiverAddress);
-
+  XML_Packet packet = createXMLPacket();
   // Prepare the client socket to send the file.
   const char *ip_address = "10.215.133.1"; // Destination IP address
   sendXMLPacketTo(packet, ip_address, XML_ACK_NEEDED);
