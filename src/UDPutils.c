@@ -90,7 +90,12 @@ void* waitingAckThread(void* args){
     if(returnCause == 0){
       pthread_mutex_lock(&mutexPacket);
       if(inputPacket.header.isAck){
-        int IP_port = atoi(strrchr(inputPacket.header.receiverAddress,'.') + 1);
+        int IP_port = getIPDevice(inputPacket.header.receiverAddress);
+        if(IP_port < 0){
+          // Disregard this packet, the IP is not valid!
+          pthread_mutex_unlock(&mutexPacket);
+          continue;
+        }
         printf("Device with ending IP %d woke me up\n", IP_port);
 
         int deviceIndex;

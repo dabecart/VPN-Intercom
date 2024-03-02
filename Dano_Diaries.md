@@ -6,6 +6,8 @@ Here I have my TODO chores because if I write them all over the code, I'll end u
 
 TODOs:
 - Add to UDPutils' sendXMLPacketTo() the expects response section. 
+- Think about how to handle repetitions of packets in case it does not reach the device at the end!
+- Think about how to handle wrong packets with wrong IPs.
 
 ## 01/03/2024: First commit, getting a dummy program to work
 
