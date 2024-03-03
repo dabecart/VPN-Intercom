@@ -33,6 +33,7 @@
 typedef struct{
   uint8_t expectingAck;
   uint8_t expectingResponse;
+  uint8_t multipackMode;
   uint64_t lastTimeSent;
   pthread_cond_t* ackCondition;
   pthread_cond_t* responseCondition;

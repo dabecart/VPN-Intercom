@@ -15,11 +15,14 @@ char deviceIP[16];
 void* UDPListener(void *args) {
   struct sockaddr_in client_address;
   char inputBuffer[BUFFER_SIZE];
+  uint8_t multiPacketInProgress = 0;
+
+  char* multipackBuffer = NULL;
+  size_t multipackSize = 0;
+
   socklen_t client_address_len = sizeof(client_address);
 
   while(1) {
-    // memset(inputBuffer, 0, BUFFER_SIZE);
-
     // Receive message from client
     ssize_t received_bytes = recvfrom(server_socket, inputBuffer, BUFFER_SIZE, 0,
                                       (struct sockaddr *)&client_address, &client_address_len);
@@ -33,12 +36,30 @@ void* UDPListener(void *args) {
     printf("Received message from %s:%d: \x1b[35m %s \x1b[0m", inet_ntoa(client_address.sin_addr),
       ntohs(client_address.sin_port), inputBuffer);
 
-    // Check if received message is XML or not.
-    xmlDocPtr doc = xmlReadMemory(inputBuffer, received_bytes, "noname.xml", NULL, XML_PARSE_NOBLANKS);
-    if (doc == NULL) {
-      fprintf(stderr, "Received buffer may not be an XML");
-      continue;
+    xmlDocPtr doc;
+    // If the device is in multipacket, save it directly to the multipackBuffer.
+    if(acklist[getIPDevice(inputPacket.header.transmitterAddress)].multipackMode){
+      memcpy(multipackBuffer+multipackSize, inputBuffer, received_bytes);      
+      multipackSize += received_bytes;
+
+      // Detected end of multipacket mode!
+      if(strcmp(multipackBuffer+multipackSize-4, "end%%") == 0){
+        doc = xmlReadMemory(multipackBuffer, multipackSize, "noname.xml", NULL, XML_PARSE_NOBLANKS);
+      
+        // Disable multipack.
+        acklist[getIPDevice(inputPacket.header.transmitterAddress)].multipackMode = 0;
+        free(multipackBuffer);     
+        multipackBuffer = NULL;
+      }
+    }else{
+      // Check if received message is XML or not.
+      doc = xmlReadMemory(inputBuffer, received_bytes, "noname.xml", NULL, XML_PARSE_NOBLANKS);
+      if (doc == NULL) {
+        fprintf(stderr, "Received buffer may not be an XML");
+        continue;
+      }
     }
+
 
     // If the mutex is locked that means that another thread is using the input buffer
     // and this device should send a BUSY signal.
@@ -73,7 +94,6 @@ void* UDPListener(void *args) {
     int parseResult = toXMLPacket(doc, &inputPacket);
     pthread_mutex_unlock(&mutexPacket);
 
-
     if(parseResult){
       //XML file could not be parsed.
       continue;
@@ -87,6 +107,16 @@ void* UDPListener(void *args) {
     }
 
     // If it's a REQUEST...
+    // Device asking for multipack!
+    if((strcmp(inputPacket.header.functionSemantic, "multipack") == 0)){
+      // Device was already in multipack, release data.
+      if(acklist[getIPDevice(inputPacket.header.transmitterAddress)].multipackMode){
+        free(multipackBuffer);
+      }
+      acklist[getIPDevice(inputPacket.header.transmitterAddress)].multipackMode = 1;
+      multipackBuffer = (char*) malloc(inputPacket.header.dataSize);
+    }
+    
     if(inputPacket.header.expectsAck){
       sendAckPacketTo(&inputPacket);
     }
@@ -98,6 +128,7 @@ void* UDPListener(void *args) {
 }
 
 void* waitingAckThread(void* args){
+  static int retVal = 0;
   struct timespec wakeUpTime;
   struct timeval now;
   pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -173,12 +204,14 @@ void* waitingAckThread(void* args){
 
   if(repetitions >= UDP_SENDING_REPETITIONS){
     fprintf(stderr, "Exhausted ack repetitions!");
+    retVal = -1;
+    pthread_exit(&retVal);
   }else{
     printf("Ack received!");
   }
 
   pthread_mutex_destroy(&mutex);
-  return NULL;
+  pthread_exit(&retVal);
 }
 
 // Send a buffer of certain size to an IP address.
@@ -194,7 +227,7 @@ int sendBufferTo(char* buffer, int buffer_size, const char* ip_address){
   client_address.sin_port = htons(PORT);
   if (inet_aton(ip_address, &client_address.sin_addr) == 0) {
     perror("Invalid address");
-    exit(EXIT_FAILURE);
+    return -1;
   }
   
   if (sendto(server_socket, buffer, buffer_size, 0,
@@ -228,25 +261,12 @@ int sendXMLPacketTo(XML_Packet xml, char* ip_address, uint8_t flags,
   int estimatedSize = encode_output_size(xml.header.dataSize) + HEADER_OVERHEAD;
   int multipackConnection = 0;
   if(estimatedSize > MAX_DATA_PAYLOAD_SIZE){
-    // struct timespec wakeUpTime;
-    // struct timeval now;
-    // pthread_mutex_t multipack_mutex = PTHREAD_MUTEX_INITIALIZER;
-    // pthread_cond_t multipack_cond = PTHREAD_COND_INITIALIZER;
-
     // Enable a multi-packet connection!
     XML_Packet multiPackRequest = createXMLPacket();
     strcpy(multiPackRequest.header.functionSemantic, "multipack");
+    multiPackRequest.header.dataSize = estimatedSize;
     int returnCause = sendXMLPacketTo(multiPackRequest, ip_address, XML_ACK_NEEDED | XML_BLOCK, NULL, NULL);
     
-    // // Create a timed condition to send a multi-packet.
-    // gettimeofday(&now, NULL);
-    // wakeUpTime.tv_sec = now.tv_sec + WAIT_FOR_MULTIPACK;
-    // wakeUpTime.tv_nsec = now.tv_usec*1000;  // To be exact to the nanosecond!
-
-    // // Either be woken up by an acknowledge function or wait for the timeout.
-    // pthread_mutex_lock(&multipack_mutex);
-    // int returnCause = pthread_cond_timedwait(&multipack_cond, &multipack_mutex, &wakeUpTime);
-    // pthread_mutex_unlock(&multipack_mutex);
     if(returnCause == 0){
       printf("Commencing multi-packet\n");
       multipackConnection = 1;
@@ -256,7 +276,7 @@ int sendXMLPacketTo(XML_Packet xml, char* ip_address, uint8_t flags,
     }
   }  
 
-  // Update sending time.
+  // Update sending time of the packet.
   uint64_t startTime = (uint64_t) time(NULL);
   if(xml.header.isResponse || xml.header.isAck){
     // This packet is a response.
@@ -268,6 +288,7 @@ int sendXMLPacketTo(XML_Packet xml, char* ip_address, uint8_t flags,
     memcpy(xml.header.transmitterAddress, deviceIP, strlen(deviceIP));
     memcpy(xml.header.receiverAddress, ip_address, strlen(ip_address));
   }
+
   if(flags&XML_ACK_NEEDED){
     xml.header.expectsAck = 1;
     // Add to the acknowledge watch list.
@@ -280,6 +301,7 @@ int sendXMLPacketTo(XML_Packet xml, char* ip_address, uint8_t flags,
     acklist[deviceIPIndex].lastTimeSent = xml.header.sentTime;
     acklist[deviceIPIndex].ackCondition = ackCondition;
   }
+
   // Convert to XML file
   xmlDocPtr xmlDoc = toXMLDocument(xml);
   xmlChar *buffer = NULL;
@@ -291,6 +313,7 @@ int sendXMLPacketTo(XML_Packet xml, char* ip_address, uint8_t flags,
   // int result = xmlSaveFormatFile(filename, xmlDoc, 1); // 1 for formatting
   
   // Send the buffer to the IP.
+  int allOk = 0;
   xmlChar *outBuffer = buffer;
   int remainingBytes = buffer_size;
   while(remainingBytes > 0){
@@ -299,20 +322,29 @@ int sendXMLPacketTo(XML_Packet xml, char* ip_address, uint8_t flags,
       outSz = remainingBytes;
     }
     
-    sendBufferTo(outBuffer, outSz, ip_address);
+    int sendResult = sendBufferTo(outBuffer, outSz, ip_address);
 
-    if(flags&XML_ACK_NEEDED || multipackConnection){
+    if((flags&XML_ACK_NEEDED) || multipackConnection){
       if (pthread_create(&tx_handle, NULL, waitingAckThread, NULL) != 0) {
         perror("pthread_create acknowledgement");
-        exit(EXIT_FAILURE);
+        allOk = -1;
+        break;
       }
     }
 
     // If it needs to block, wait until the child thread ends.
-    if(flags&XML_BLOCK || multipackConnection){
-      if (pthread_join(tx_handle, NULL) != 0) {
+    if((flags&XML_BLOCK) || multipackConnection){
+      int *ackResult;
+      if (pthread_join(tx_handle, (void**)&ackResult) != 0) {
           perror("pthread_join TX_handle");
-          exit(EXIT_FAILURE);
+          allOk = -1;
+          break;
+      }
+
+      if(sendResult || *ackResult){
+        fprintf(stderr, "Error sending packet");
+        allOk = -1;
+        break;
       }
     }
 
@@ -324,7 +356,7 @@ int sendXMLPacketTo(XML_Packet xml, char* ip_address, uint8_t flags,
   xmlFree(buffer);
   xmlFreeDoc(xmlDoc);
 
-  return 0;
+  return allOk;
 }
 
 int sendAckPacketTo(XML_Packet *pack){
