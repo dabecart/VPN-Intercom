@@ -23,6 +23,8 @@ void* UDPListener(void *args) {
   socklen_t client_address_len = sizeof(client_address);
 
   while(1) {
+    memset(inputBuffer, 0, BUFFER_SIZE);
+
     // Receive message from client
     ssize_t received_bytes = recvfrom(server_socket, inputBuffer, BUFFER_SIZE, 0,
                                       (struct sockaddr *)&client_address, &client_address_len);
@@ -36,9 +38,15 @@ void* UDPListener(void *args) {
     printf("Received message from %s:%d: \x1b[35m %s \x1b[0m", inet_ntoa(client_address.sin_addr),
       ntohs(client_address.sin_port), inputBuffer);
 
+    int deviceID = getIPDevice(inet_ntoa(client_address.sin_addr));
+    // If the IP is wrong, skip the packet.
+    if(deviceID < 0){
+      continue;
+    }
+
     xmlDocPtr doc;
     // If the device is in multipacket, save it directly to the multipackBuffer.
-    if(acklist[getIPDevice(inputPacket.header.transmitterAddress)].multipackMode){
+    if(acklist[deviceID].multipackMode){
       memcpy(multipackBuffer+multipackSize, inputBuffer, received_bytes);      
       multipackSize += received_bytes;
 
@@ -47,7 +55,7 @@ void* UDPListener(void *args) {
         doc = xmlReadMemory(multipackBuffer, multipackSize, "noname.xml", NULL, XML_PARSE_NOBLANKS);
       
         // Disable multipack.
-        acklist[getIPDevice(inputPacket.header.transmitterAddress)].multipackMode = 0;
+        acklist[deviceID].multipackMode = 0;
         free(multipackBuffer);     
         multipackBuffer = NULL;
       }
@@ -110,11 +118,12 @@ void* UDPListener(void *args) {
     // Device asking for multipack!
     if((strcmp(inputPacket.header.functionSemantic, "multipack") == 0)){
       // Device was already in multipack, release data.
-      if(acklist[getIPDevice(inputPacket.header.transmitterAddress)].multipackMode){
+      if(acklist[deviceID].multipackMode){
         free(multipackBuffer);
       }
-      acklist[getIPDevice(inputPacket.header.transmitterAddress)].multipackMode = 1;
+      acklist[deviceID].multipackMode = 1;
       multipackBuffer = (char*) malloc(inputPacket.header.dataSize);
+      printf("Multipacket enabled with device %d\n", deviceID);
     }
     
     if(inputPacket.header.expectsAck){
