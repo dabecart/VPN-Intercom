@@ -29,42 +29,42 @@ xmlDocPtr toXMLDocument(XML_Packet packet) {
     xmlNodePtr parentNode = xmlNewNode(NULL, BAD_CAST "packet");
     xmlDocSetRootElement(doc, parentNode);
 
-    xmlNodePtr headerNode = xmlNewNode(NULL, BAD_CAST "header");
+    xmlNodePtr headerNode = xmlNewNode(NULL, BAD_CAST "head");
 
     char* dumbCopy = malloc(30);    // Will surely be big enough for copying all fields.
     memcpy(dumbCopy, packet.header.receiverAddress, sizeof(packet.header.transmitterAddress));
-    xmlNodePtr child = createXmlNode(doc, "transmitter", packet.header.transmitterAddress);
+    xmlNodePtr child = createXmlNode(doc, "tx", packet.header.transmitterAddress);
     xmlAddChild(headerNode, child);
 
     memcpy(dumbCopy, packet.header.receiverAddress, sizeof(packet.header.receiverAddress));
-    child = createXmlNode(doc, "receiver", packet.header.receiverAddress);
+    child = createXmlNode(doc, "rx", packet.header.receiverAddress);
     xmlAddChild(headerNode, child);
 
     memcpy(dumbCopy, packet.header.transmitterAcronym, sizeof(packet.header.transmitterAcronym));
-    child = createXmlNode(doc, "acronym", dumbCopy);
+    child = createXmlNode(doc, "acron", dumbCopy);
     xmlAddChild(headerNode, child);
-    
+
     sprintf(dumbCopy, "%d", packet.header.dataSize);
-    child = createXmlNode(doc, "dataSize", dumbCopy);
+    child = createXmlNode(doc, "size", dumbCopy);
     xmlAddChild(headerNode, child);
 
     memcpy(dumbCopy, packet.header.functionSemantic, sizeof(packet.header.functionSemantic));
-    child = createXmlNode(doc, "function", dumbCopy);
+    child = createXmlNode(doc, "func", dumbCopy);
     xmlAddChild(headerNode, child);
 
     sprintf(dumbCopy, "%d", packet.header.sentTime);
-    child = createXmlNode(doc, "sentTime", dumbCopy);
+    child = createXmlNode(doc, "txT", dumbCopy);
     xmlAddChild(headerNode, child);
 
     sprintf(dumbCopy, "%d", packet.header.responseTime);
-    child = createXmlNode(doc, "responseTime", dumbCopy);
+    child = createXmlNode(doc, "rxT", dumbCopy);
     xmlAddChild(headerNode, child);
 
     uint8_t flags = packet.header.expectsAck;
     flags |= packet.header.isResponse << 1;
     flags |= packet.header.isAck << 2;
     sprintf(dumbCopy, "%d", flags);
-    child = createXmlNode(doc, "flags", dumbCopy);
+    child = createXmlNode(doc, "flag", dumbCopy);
     xmlAddChild(headerNode, child);
 
     xmlAddChild(parentNode, headerNode);
@@ -73,11 +73,13 @@ xmlDocPtr toXMLDocument(XML_Packet packet) {
 
     for(int i = 0; i < packet.data.count; i++){
         DataField* currentField = &packet.data.fields[i];
-        child = createXmlNode(doc, &currentField->name[0], vector_get_char_buffer(&currentField->data));
-        
+        size_t nodeSize = 0;
+        child = createXmlNode(doc, currentField->name, 
+                              vector_encode(&currentField->data, &nodeSize));
+
+        // printf("%s %ld\n", currentField->name, currentField->size);
         xmlNewProp(child, BAD_CAST "type", BAD_CAST XML_TYPE_NAMES[currentField->type]);
-        
-        snprintf(dumbCopy, sizeof(dumbCopy), "%d", currentField->size);
+        sprintf(dumbCopy, "%ld", nodeSize);
         xmlNewProp(child, BAD_CAST "size", BAD_CAST dumbCopy);
 
         xmlAddChild(dataNode, child);
@@ -100,12 +102,12 @@ int toXMLPacket(xmlDocPtr ptr, XML_Packet *outputPacket){
     
     // HEADER
     xmlNode *headerNode = rootNode->children;
-    if(headerNode!=NULL && xmlStrcmp(headerNode->name, (const xmlChar*)"header") != 0){
+    if(headerNode!=NULL && xmlStrcmp(headerNode->name, (const xmlChar*)"head") != 0){
         goto structure_error;
     }
 
     xmlNode *currNode = headerNode->children;
-    if(xmlStrcmp(currNode->name, (const xmlChar*)"transmitter") == 0){
+    if(xmlStrcmp(currNode->name, (const xmlChar*)"tx") == 0){
         char *content = (char*) xmlNodeGetContent(currNode);
         memcpy(pack.header.transmitterAddress, content, strlen(content));
     }else{
@@ -113,7 +115,7 @@ int toXMLPacket(xmlDocPtr ptr, XML_Packet *outputPacket){
     }
 
     currNode = currNode->next;
-    if(xmlStrcmp(currNode->name, (const xmlChar*)"receiver") == 0){
+    if(xmlStrcmp(currNode->name, (const xmlChar*)"rx") == 0){
         char *content = (char*) xmlNodeGetContent(currNode);
         memcpy(pack.header.receiverAddress, content, strlen(content));
     }else{
@@ -121,7 +123,7 @@ int toXMLPacket(xmlDocPtr ptr, XML_Packet *outputPacket){
     }
 
     currNode = currNode->next;
-    if(xmlStrcmp(currNode->name, (const xmlChar*)"acronym") == 0){
+    if(xmlStrcmp(currNode->name, (const xmlChar*)"acron") == 0){
         char *content = (char*) xmlNodeGetContent(currNode);
         memcpy(pack.header.transmitterAcronym, content, strlen(content));
     }else{
@@ -129,7 +131,7 @@ int toXMLPacket(xmlDocPtr ptr, XML_Packet *outputPacket){
     }
 
     currNode = currNode->next;
-    if(xmlStrcmp(currNode->name, (const xmlChar*)"dataSize") == 0){
+    if(xmlStrcmp(currNode->name, (const xmlChar*)"size") == 0){
         char *content = (char*) xmlNodeGetContent(currNode);
         pack.header.dataSize = strtoull(content, NULL, 10); // base 10
     }else{
@@ -137,7 +139,7 @@ int toXMLPacket(xmlDocPtr ptr, XML_Packet *outputPacket){
     }
 
     currNode = currNode->next;
-    if(xmlStrcmp(currNode->name, (const xmlChar*)"function") == 0){
+    if(xmlStrcmp(currNode->name, (const xmlChar*)"func") == 0){
         char *content = (char*) xmlNodeGetContent(currNode);
         memcpy(pack.header.functionSemantic, content, strlen(content));
     }else{
@@ -145,7 +147,7 @@ int toXMLPacket(xmlDocPtr ptr, XML_Packet *outputPacket){
     }
 
     currNode = currNode->next;
-    if(xmlStrcmp(currNode->name, (const xmlChar*)"sentTime") == 0){
+    if(xmlStrcmp(currNode->name, (const xmlChar*)"txT") == 0){
         char *content = (char*) xmlNodeGetContent(currNode);
         pack.header.sentTime = strtoull(content, NULL, 10); // base 10
     }else{
@@ -153,7 +155,7 @@ int toXMLPacket(xmlDocPtr ptr, XML_Packet *outputPacket){
     }
 
     currNode = currNode->next;
-    if(xmlStrcmp(currNode->name, (const xmlChar*)"responseTime") == 0){
+    if(xmlStrcmp(currNode->name, (const xmlChar*)"rxT") == 0){
         char *content = (char*) xmlNodeGetContent(currNode);
         pack.header.responseTime = strtoull(content, NULL, 10); // base 10
     }else{
@@ -161,7 +163,7 @@ int toXMLPacket(xmlDocPtr ptr, XML_Packet *outputPacket){
     }
 
     currNode = currNode->next;
-    if(xmlStrcmp(currNode->name, (const xmlChar*)"flags") == 0){
+    if(xmlStrcmp(currNode->name, (const xmlChar*)"flag") == 0){
         char *content = (char*) xmlNodeGetContent(currNode);
         int flags = atoi(content);
         pack.header.expectsAck = flags & 0x1;
@@ -199,6 +201,6 @@ int toXMLPacket(xmlDocPtr ptr, XML_Packet *outputPacket){
     return 0;
 
 structure_error:
-    fprintf(stderr, "This packet does not follow the defined structure!\n");
+    fprintf(stderr, "\x1b[0mThis packet does not follow the defined structure!\n");
     return -1;
 }

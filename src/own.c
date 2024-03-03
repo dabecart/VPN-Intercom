@@ -12,7 +12,7 @@ void* runtime_routine(void* args){
   XML_Packet packet = createXMLPacket();
   // Prepare the client socket to send the file.
   char *ip_address = "10.215.133.1"; // Destination IP address
-  packet.header.functionSemantic = "photo";
+  strcpy(packet.header.functionSemantic, "photo");
   sendXMLPacketTo(packet, ip_address, XML_ACK_NEEDED, NULL, NULL);
 
   while(1){
@@ -46,7 +46,7 @@ int processIncomingPackages(XML_Packet* packet){
   if(cmp == 0){
     char* photoBuffer = NULL;
     size_t photoFileSize;
-    int result = takePicture(1280, 720, photoBuffer, &photoFileSize);
+    int result = takePicture(1280, 720, &photoBuffer, &photoFileSize);
     if(!result){ // If no error happens
       Vector v = {photoBuffer, photoFileSize, photoFileSize};
       packet->data.fields[packet->data.count++] = (DataField) {
@@ -55,7 +55,7 @@ int processIncomingPackages(XML_Packet* packet){
         photoFileSize,
         v 
       };
-      
+
       sendResponseTo(packet);
     }
   }

@@ -172,6 +172,7 @@ int sendBufferTo(char* buffer, int buffer_size, const char* ip_address){
   if (sendto(server_socket, buffer, buffer_size, 0,
       (struct sockaddr *)&client_address, sizeof(client_address)) == -1) {
     perror("Error sending response");
+    printf("Output message: \x1b[31m%s\x1b[0m\n", buffer);
     return -1;
   }else{
       printf("Message sent\n");
@@ -198,7 +199,6 @@ int sendXMLPacketTo(XML_Packet xml, char* ip_address, uint8_t flags,
     memcpy(xml.header.transmitterAddress, deviceIP, strlen(deviceIP));
     memcpy(xml.header.receiverAddress, ip_address, strlen(ip_address));
   }
-
   if(flags&XML_ACK_NEEDED){
     xml.header.expectsAck = 1;
     // Add to the acknowledge watch list.
@@ -211,7 +211,6 @@ int sendXMLPacketTo(XML_Packet xml, char* ip_address, uint8_t flags,
     acklist[deviceIPIndex].lastTimeSent = xml.header.sentTime;
     acklist[deviceIPIndex].ackCondition = ackCondition;
   }
-
   // Convert to XML file
   xmlDocPtr xmlDoc = toXMLDocument(xml);
   xmlChar *buffer = NULL;
@@ -221,10 +220,8 @@ int sendXMLPacketTo(XML_Packet xml, char* ip_address, uint8_t flags,
   // Save the XML document to a file
   // const char *filename = "output.xml";
   // int result = xmlSaveFormatFile(filename, xmlDoc, 1); // 1 for formatting
-  
   // Send the buffer to the IP.
   sendBufferTo(buffer, buffer_size, ip_address);
-
   if(flags&XML_ACK_NEEDED){
     if (pthread_create(&tx_handle, NULL, waitingAckThread, NULL) != 0) {
       perror("pthread_create acknowledgement");

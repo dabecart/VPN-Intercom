@@ -27,7 +27,5 @@ void vector_add(Vector *vector, char value);
 char vector_get(Vector *vector, size_t index);
 // Function to free the memory used by the vector
 void vector_free(Vector *vector); 
-// Get buffer in special code.
-char* vector_get_char_buffer(Vector* vec);
 
 #endif

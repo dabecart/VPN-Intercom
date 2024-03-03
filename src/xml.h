@@ -13,6 +13,7 @@
 #include <libxml/parser.h>
 
 #include "vector.h"
+#include "security.h"
 
 // Maximum number of variables allowed by protocol.
 #define XML_DATA_BLOCK_VARIABLE_COUNT 10

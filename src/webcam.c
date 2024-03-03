@@ -5,7 +5,7 @@ struct buffer {
   size_t length;
 };
 
-int takePicture(int width, int height, char* output, size_t* outSize) {
+int takePicture(int width, int height, char** output, size_t* outSize) {
   if(width > 1920 || height > 1920 || width <= 0 || height <= 0){
     fprintf(stderr, "Dimensions are not valid!");
     return -1;
@@ -118,14 +118,18 @@ int takePicture(int width, int height, char* output, size_t* outSize) {
   }
 
   // Save image in JPEG format to a buffer
-  output = (char *)malloc(buf.bytesused * sizeof(char));
-  if (!output) {
+  char *chBuff = (char *) malloc(buf.bytesused);
+  if (!chBuff) {
     perror("Failed to allocate memory for image buffer");
     close(fd);
     return -1;
   }
-  memcpy(output, buffers[buf.index].start, buf.bytesused);
+  memcpy(chBuff, buffers[buf.index].start, buf.bytesused);
+  
+  // Save the output.
+  *output = chBuff;
   *outSize = buf.bytesused;
+  printf("Photo taken! Size: %ld Start:%d\n", buf.bytesused, *output[0]);
 
   // To save the photo to a file.
   // FILE *fp = fopen("captured_photo.jpg", "wb");

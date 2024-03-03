@@ -13,6 +13,6 @@
 #define VIDEO_DEVICE "/dev/video0"
 #define NUM_BUFFERS 4
 
-int takePicture(int width, int height, char* output, size_t* outSize);
+int takePicture(int width, int height, char** output, size_t* outSize);
 
 #endif
