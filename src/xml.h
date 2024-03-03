@@ -45,9 +45,16 @@ typedef struct{
     uint64_t responseTime;
 
     // Flags
+    // Set if the sender expects an Ack signal.
     uint8_t expectsAck;
+    // Set if the message is a response to a query.
     uint8_t isResponse;
+    // Set if this message IS an acknowledge signal.
     uint8_t isAck;
+    // Set if this message IS a busy signal, meaning that
+    // the receiver is busy processing other things and that
+    // it should wait for an ACK signal.
+    uint8_t busy;
 }XML_Header;
 
 // A single field inside the data node in an XML file.

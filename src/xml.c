@@ -44,7 +44,7 @@ xmlDocPtr toXMLDocument(XML_Packet packet) {
     child = createXmlNode(doc, "acron", dumbCopy);
     xmlAddChild(headerNode, child);
 
-    sprintf(dumbCopy, "%d", packet.header.dataSize);
+    sprintf(dumbCopy, "%ld", packet.header.dataSize);
     child = createXmlNode(doc, "size", dumbCopy);
     xmlAddChild(headerNode, child);
 
@@ -52,18 +52,22 @@ xmlDocPtr toXMLDocument(XML_Packet packet) {
     child = createXmlNode(doc, "func", dumbCopy);
     xmlAddChild(headerNode, child);
 
-    sprintf(dumbCopy, "%d", packet.header.sentTime);
+    sprintf(dumbCopy, "%ld", packet.header.sentTime);
     child = createXmlNode(doc, "txT", dumbCopy);
     xmlAddChild(headerNode, child);
 
-    sprintf(dumbCopy, "%d", packet.header.responseTime);
+    sprintf(dumbCopy, "%ld", packet.header.responseTime);
     child = createXmlNode(doc, "rxT", dumbCopy);
     xmlAddChild(headerNode, child);
 
     uint8_t flags = packet.header.expectsAck;
     flags |= packet.header.isResponse << 1;
     flags |= packet.header.isAck << 2;
-    sprintf(dumbCopy, "%d", flags);
+    flags |= packet.header.busy << 3;
+    // Neat trick to add leading zeros but with a fixed digit width.
+    int decimalPlaces = 1 + (flags>=10) + (flags>=100);
+    strcpy(dumbCopy, "000");
+    sprintf(dumbCopy + 3 - decimalPlaces, "%d", flags);
     child = createXmlNode(doc, "flag", dumbCopy);
     xmlAddChild(headerNode, child);
 
@@ -78,7 +82,7 @@ xmlDocPtr toXMLDocument(XML_Packet packet) {
                               vector_encode(&currentField->data, &nodeSize));
 
         // printf("%s %ld\n", currentField->name, currentField->size);
-        xmlNewProp(child, BAD_CAST "type", BAD_CAST XML_TYPE_NAMES[currentField->type]);
+        // xmlNewProp(child, BAD_CAST "type", BAD_CAST XML_TYPE_NAMES[currentField->type]);
         sprintf(dumbCopy, "%ld", nodeSize);
         xmlNewProp(child, BAD_CAST "size", BAD_CAST dumbCopy);
 

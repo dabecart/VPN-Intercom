@@ -35,13 +35,13 @@ int main() {
 
     printf("UDP server listening on port %d...\n", PORT);
 
-        struct sockaddr_in client_address;
+    struct sockaddr_in client_address;
     socklen_t client_address_len = sizeof(client_address);
     char buffer[BUFFER_SIZE];
 
     while(1) {
         // Receive message from client
-        memset(buffer, 0, BUFFER_SIZE);
+        // memset(buffer, 0, BUFFER_SIZE);
         ssize_t received_bytes = recvfrom(server_socket, buffer, BUFFER_SIZE, 0,
                                           (struct sockaddr *)&client_address, &client_address_len);
         if (received_bytes == -1) {

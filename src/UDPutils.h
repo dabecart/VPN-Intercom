@@ -21,7 +21,14 @@
 #define MAX_SUPPORTED_DEVICES 10
 
 #define PORT 8888
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 2048
+
+// Overhead size for the header.
+#define HEADER_OVERHEAD 250
+// Number of data bytes per payload.
+// 1400 is an average payload size in UDP over IPv4.
+#define MAX_DATA_PAYLOAD_SIZE 1400
+#define WAIT_FOR_MULTIPACK 3 // sec
 
 typedef struct{
   uint8_t expectingAck;
