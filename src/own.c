@@ -2,6 +2,7 @@
 
 OwnVariables vbes;
 pthread_t runtime_handler;
+pthread_t packet_handler;
 
 #ifdef __RPI4__
 // #pragma message("Building for the rpi4") 
@@ -22,7 +23,7 @@ void* runtime_routine(void* args){
   return NULL;
 }
 
-int processIncomingPackages(XML_Packet* packet){
+int processPackage(XML_Packet* packet){
   return 0;
 }
 #endif
@@ -40,7 +41,7 @@ void* runtime_routine(void* args){
   return NULL;
 }
 
-int processIncomingPackages(XML_Packet* packet){
+int processPackage(XML_Packet* packet){
   // Get image.
   int cmp = strcmp(packet->header.functionSemantic, "photo");
   if(cmp == 0){
@@ -70,4 +71,18 @@ pthread_t* launchRuntimeRoutine(){
       exit(EXIT_FAILURE);
   }
   return &runtime_handler;
+}
+
+void* thread_process_packet(void* arg){
+  XML_Packet* pack = (XML_Packet*) arg;
+  processPackage(pack);
+  return NULL;
+}
+
+int processIncomingPackages(XML_Packet* packet){
+  if (pthread_create(&packet_handler, NULL, thread_process_packet, (void*)packet) != 0) {
+      perror("pthread_create processIncomingPackage: ");
+      return -1;
+  }
+  return 0;
 }

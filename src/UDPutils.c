@@ -24,6 +24,7 @@ void* UDPListener(void *args) {
 
   while(1) {
     memset(inputBuffer, 0, BUFFER_SIZE);
+    printf("Awaiting\n");
 
     // Receive message from client
     ssize_t received_bytes = recvfrom(server_socket, inputBuffer, BUFFER_SIZE, 0,
