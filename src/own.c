@@ -57,7 +57,12 @@ int processPackage(XML_Packet* packet){
         v 
       };
 
-      sendResponseTo(packet);
+      int result = sendResponseTo(packet);
+      if(result){
+        printf("Error sending image\n");
+      }else{
+        printf("Image sent OK\n");
+      }
     }
   }
 }
