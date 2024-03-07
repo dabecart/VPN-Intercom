@@ -44,7 +44,7 @@ xmlDocPtr toXMLDocument(XML_Packet packet) {
     child = createXmlNode(doc, "acron", dumbCopy);
     xmlAddChild(headerNode, child);
 
-    sprintf(dumbCopy, "%ld", packet.header.dataSize);
+    sprintf(dumbCopy, "%Ld", packet.header.dataSize);
     child = createXmlNode(doc, "size", dumbCopy);
     xmlAddChild(headerNode, child);
 
@@ -52,11 +52,11 @@ xmlDocPtr toXMLDocument(XML_Packet packet) {
     child = createXmlNode(doc, "func", dumbCopy);
     xmlAddChild(headerNode, child);
 
-    sprintf(dumbCopy, "%ld", packet.header.sentTime);
+    sprintf(dumbCopy, "%Ld", packet.header.sentTime);
     child = createXmlNode(doc, "txT", dumbCopy);
     xmlAddChild(headerNode, child);
 
-    sprintf(dumbCopy, "%ld", packet.header.responseTime);
+    sprintf(dumbCopy, "%Ld", packet.header.responseTime);
     child = createXmlNode(doc, "rxT", dumbCopy);
     xmlAddChild(headerNode, child);
 
@@ -81,9 +81,9 @@ xmlDocPtr toXMLDocument(XML_Packet packet) {
         child = createXmlNode(doc, currentField->name, 
                               vector_encode(&currentField->data, &nodeSize));
 
-        // printf("%s %ld\n", currentField->name, currentField->size);
+        // printf("%s %Ld\n", currentField->name, currentField->size);
         // xmlNewProp(child, BAD_CAST "type", BAD_CAST XML_TYPE_NAMES[currentField->type]);
-        sprintf(dumbCopy, "%ld", nodeSize);
+        sprintf(dumbCopy, "%Ld", nodeSize);
         xmlNewProp(child, BAD_CAST "size", BAD_CAST dumbCopy);
 
         xmlAddChild(dataNode, child);

@@ -129,7 +129,7 @@ int takePicture(int width, int height, char** output, size_t* outSize) {
   // Save the output.
   *output = chBuff;
   *outSize = buf.bytesused;
-  printf("Photo taken! Size: %ld Start:%d\n", buf.bytesused, *output[0]);
+  printf("Photo taken! Size: %Ld Start:%d\n", buf.bytesused, *output[0]);
 
   // To save the photo to a file.
   // FILE *fp = fopen("captured_photo.jpg", "wb");

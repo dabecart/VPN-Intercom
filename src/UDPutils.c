@@ -9,6 +9,7 @@ XML_Packet inputPacket;
 pthread_mutex_t mutexPacket;
 pthread_t rx_handle, tx_handle;
 pthread_cond_t responseReceived_wakeUp;
+int ackMessageReceived = 0;
 
 char deviceIP[16];
 
@@ -125,6 +126,7 @@ void* UDPListener(void *args) {
     if(inputPacket.header.responseTime>0 && (inputPacket.header.isAck || inputPacket.header.isResponse)){
       printf("Waking up response received\n");
       pthread_cond_signal(&responseReceived_wakeUp);
+      ackMessageReceived = 1;
       continue;
     }
 
@@ -139,7 +141,7 @@ void* UDPListener(void *args) {
       // Lock the input packet to be able to send the acks.
       pthread_mutex_lock(&mutexPacket);
     
-      printf("Multipacket enabled with device %d, buffer size: %ld\n", deviceID, inputPacket.header.dataSize);
+      printf("Multipacket enabled with device %d, buffer size: %Ld\n", deviceID, inputPacket.header.dataSize);
     }
     
     if(inputPacket.header.expectsAck){
@@ -166,10 +168,13 @@ void* waitingAckThread(void* args){
     wakeUpTime.tv_sec = now.tv_sec + UDP_SENDING_INTERVAL;
     wakeUpTime.tv_nsec = now.tv_usec*1000;  // To be exact to the nanosecond!
 
-    // Either be woken up by an acknowledge function or wait for the timeout.
-    pthread_mutex_lock(&mutex);
-    returnCause = pthread_cond_timedwait(&responseReceived_wakeUp, &mutex, &wakeUpTime);
-    pthread_mutex_unlock(&mutex);
+    // Check if the message has been received beforehand.
+    if(!ackMessageReceived){
+      // Either be woken up by an acknowledge function or wait for the timeout.
+      pthread_mutex_lock(&mutex);
+      returnCause = pthread_cond_timedwait(&responseReceived_wakeUp, &mutex, &wakeUpTime);
+      pthread_mutex_unlock(&mutex);
+    }
 
     // Start by checking if the ack has already reached us.
     if(returnCause == 0){
@@ -180,6 +185,7 @@ void* waitingAckThread(void* args){
         int IP_port = getIPDevice(inputPacket.header.receiverAddress);
         if(IP_port < 0){
           // Disregard this packet, the IP is not valid!
+          ackMessageReceived = 0;
           pthread_mutex_unlock(&mutexPacket);
           continue;
         }
@@ -187,7 +193,7 @@ void* waitingAckThread(void* args){
 
         int deviceIndex;
         for(deviceIndex = 0; deviceIndex < MAX_SUPPORTED_DEVICES; deviceIndex++){
-          printf("Ind: %d   Ack?: %d  Sent: %ld\n", deviceIndex, acklist[deviceIndex].expectingAck, acklist[deviceIndex].lastTimeSent);
+          printf("Ind: %d   Ack?: %d   Sent: %Ld   Last: %Ld \n", deviceIndex, acklist[deviceIndex].expectingAck, inputPacket.header.sentTime, acklist[deviceIndex].lastTimeSent);
           // Check if this response/ack is for the already sent packet.
           if(deviceIndex==IP_port && acklist[deviceIndex].lastTimeSent==inputPacket.header.sentTime){
             int breakCondition = 0;
@@ -237,6 +243,7 @@ void* waitingAckThread(void* args){
     printf("Ack received!");
   }
 
+  ackMessageReceived = 0;
   pthread_mutex_destroy(&mutex);
   pthread_exit(&retVal);
 }
@@ -297,10 +304,10 @@ int sendXMLPacketTo(XML_Packet xml, char* ip_address, uint8_t flags,
                                         XML_ACK_NEEDED | XML_BLOCK, NULL, NULL);
       
       if(returnCause == 0){
-        printf("Commencing multi-packet of size %ld\n", estimatedSize);
+        printf("Commencing multi-packet of size %Ld\n", estimatedSize);
         multipackConnection = 1;
       }else{ // Timed-out
-        fprintf(stderr, "Could not establish multi-packet connection.");
+        fprintf(stderr, "Could not establish multi-packet connection.\n");
         return -1;
       }
     }  
@@ -314,7 +321,7 @@ int sendXMLPacketTo(XML_Packet xml, char* ip_address, uint8_t flags,
   }else{
     // This packet is a query.
     xml.header.sentTime = startTime;
-    // Se the transmitter/receiver IPs.
+    // Set the transmitter/receiver IPs.
     memcpy(xml.header.transmitterAddress, deviceIP, strlen(deviceIP));
     memcpy(xml.header.receiverAddress, ip_address, strlen(ip_address));
   }
@@ -398,6 +405,7 @@ int sendAckPacketTo(XML_Packet *pack){
   memcpy(&response.header, &pack->header, sizeof(response.header));
   response.header.isAck = 1;
   response.header.expectsAck = 0;
+  response.header.responseTime = 0;
   sendXMLPacketTo(response, response.header.transmitterAddress, 0, NULL, NULL);
   printf("Ack sent!\n");
   return 0;
